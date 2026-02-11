@@ -35,17 +35,6 @@ impl OutputFormat {
             Self::JsonLines
         }
     }
-
-    /// Get the format name for code generation
-    #[allow(dead_code)]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Debug => "debug",
-            Self::Json => "json",
-            Self::JsonLines => "jsonlines",
-            Self::Csv => "csv",
-        }
-    }
 }
 
 /// Detect if stdout is a terminal
@@ -71,14 +60,6 @@ mod tests {
         );
         assert_eq!(OutputFormat::from_str("csv"), Some(OutputFormat::Csv));
         assert_eq!(OutputFormat::from_str("invalid"), None);
-    }
-
-    #[test]
-    fn test_output_format_as_str() {
-        assert_eq!(OutputFormat::Debug.as_str(), "debug");
-        assert_eq!(OutputFormat::Json.as_str(), "json");
-        assert_eq!(OutputFormat::JsonLines.as_str(), "jsonlines");
-        assert_eq!(OutputFormat::Csv.as_str(), "csv");
     }
 
     #[test]

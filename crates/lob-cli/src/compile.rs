@@ -143,7 +143,6 @@ impl Compiler {
     }
 
     /// Create a compiler with custom rustc path and sysroot
-    #[allow(dead_code)]
     pub fn custom(rustc_path: PathBuf, sysroot: Option<PathBuf>) -> Self {
         Self {
             rustc_path,

@@ -60,12 +60,6 @@ impl Cache {
         self.cache_dir.join("binaries").join(hash)
     }
 
-    /// Get source path (whether it exists or not)
-    #[allow(dead_code)]
-    pub fn source_path(&self, hash: &str) -> PathBuf {
-        self.cache_dir.join("sources").join(format!("{}.rs", hash))
-    }
-
     /// Clear all cached binaries
     pub fn clear(&self) -> Result<()> {
         let binaries_dir = self.cache_dir.join("binaries");
@@ -216,17 +210,6 @@ mod tests {
 
         assert!(path.to_string_lossy().contains("binaries"));
         assert!(path.to_string_lossy().contains(hash));
-    }
-
-    #[test]
-    fn source_path() {
-        let cache = Cache::new().unwrap();
-        let hash = "test_hash";
-        let path = cache.source_path(hash);
-
-        assert!(path.to_string_lossy().contains("sources"));
-        assert!(path.to_string_lossy().contains(hash));
-        assert!(path.to_string_lossy().ends_with(".rs"));
     }
 
     #[test]

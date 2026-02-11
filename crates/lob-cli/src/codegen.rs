@@ -171,12 +171,6 @@ impl CodeGenerator {
 
         terminals.iter().any(|t| self.expression.contains(t))
     }
-
-    /// Get the expression
-    #[allow(dead_code)]
-    pub fn expression(&self) -> &str {
-        &self.expression
-    }
 }
 
 #[cfg(test)]
@@ -373,13 +367,5 @@ mod tests {
         // Should wrap single result in array for CSV output
         assert!(code.contains("output_csv(&[result])"));
         assert!(!code.contains("result.collect()"));
-    }
-
-    #[test]
-    fn expression_getter() {
-        let expr = "_.map(|x| x * 2)";
-        let gen = CodeGenerator::new(expr.to_string(), default_input(), OutputFormat::Debug);
-
-        assert_eq!(gen.expression(), expr);
     }
 }

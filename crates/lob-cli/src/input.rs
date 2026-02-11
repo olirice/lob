@@ -16,19 +16,6 @@ pub enum InputFormat {
     JsonLines,
 }
 
-impl InputFormat {
-    /// Get the format name for code generation
-    #[allow(dead_code)]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Lines => "lines",
-            Self::Csv => "csv",
-            Self::Tsv => "tsv",
-            Self::JsonLines => "jsonlines",
-        }
-    }
-}
-
 /// Input source configuration
 #[derive(Debug, Clone)]
 pub struct InputSource {
@@ -66,14 +53,6 @@ impl InputSource {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_input_format_as_str() {
-        assert_eq!(InputFormat::Lines.as_str(), "lines");
-        assert_eq!(InputFormat::Csv.as_str(), "csv");
-        assert_eq!(InputFormat::Tsv.as_str(), "tsv");
-        assert_eq!(InputFormat::JsonLines.as_str(), "jsonlines");
-    }
 
     #[test]
     fn test_input_source_is_stdin() {

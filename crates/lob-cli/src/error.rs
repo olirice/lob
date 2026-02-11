@@ -19,11 +19,6 @@ pub enum LobError {
     #[error("Cache error: {0}")]
     Cache(String),
 
-    /// Code generation error
-    #[allow(dead_code)]
-    #[error("Code generation error: {0}")]
-    CodeGen(String),
-
     /// Toolchain error
     #[error("Toolchain error: {0}")]
     Toolchain(String),

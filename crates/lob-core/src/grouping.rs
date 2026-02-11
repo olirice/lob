@@ -97,72 +97,7 @@ where
     }
 }
 
-/// Iterator that groups consecutive elements by a key function
-#[allow(dead_code)]
-pub struct GroupByIterator<I, K, F>
-where
-    I: Iterator,
-    K: Eq + Hash,
-    F: FnMut(&I::Item) -> K,
-{
-    iter: I,
-    key_fn: F,
-    done: bool,
-}
-
-impl<I, K, F> GroupByIterator<I, K, F>
-where
-    I: Iterator,
-    K: Eq + Hash,
-    F: FnMut(&I::Item) -> K,
-{
-    #[allow(dead_code)]
-    pub fn new(iter: I, key_fn: F) -> Self {
-        Self {
-            iter,
-            key_fn,
-            done: false,
-        }
-    }
-}
-
-impl<I, K, F> Iterator for GroupByIterator<I, K, F>
-where
-    I: Iterator,
-    K: Eq + Hash,
-    F: FnMut(&I::Item) -> K,
-{
-    type Item = (K, Vec<I::Item>);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.done {
-            return None;
-        }
-
-        // Collect all items into groups
-        let mut groups: HashMap<K, Vec<I::Item>> = HashMap::new();
-
-        for item in &mut self.iter {
-            let key = (self.key_fn)(&item);
-            groups.entry(key).or_default().push(item);
-        }
-
-        self.done = true;
-
-        // Return first group (deterministic iteration order not guaranteed)
-        groups.into_iter().next()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        if self.done {
-            (0, Some(0))
-        } else {
-            (0, None)
-        }
-    }
-}
-
-/// Specialized `group_by` that returns all groups at once (more useful in practice)
+/// Specialized `group_by` that returns all groups at once
 pub struct GroupByCollectIterator<I, K, F>
 where
     I: Iterator,
