@@ -222,6 +222,21 @@ lob data.csv --parse-csv '_.filter(...)' --format jsonl | jq '.name'
 lob data.csv --parse-csv '_.filter(|r| r["age"].parse::<i32>().unwrap() > 25)' --format csv
 ```
 
+### Table Output
+
+```bash
+# Display as formatted table (requires CSV/JSON input)
+lob users.csv --parse-csv '_.take(5)' --format table
+# Output:
+# ╭─────┬─────────────────────┬─────────╮
+# │ age │ email               │ name    │
+# ├─────┼─────────────────────┼─────────┤
+# │ 30  │ alice@example.com   │ Alice   │
+# │ 25  │ bob@example.com     │ Bob     │
+# │ 35  │ charlie@example.com │ Charlie │
+# ╰─────┴─────────────────────┴─────────╯
+```
+
 ## Advanced Features
 
 ### Cache Management
@@ -232,6 +247,21 @@ lob --cache-stats
 
 # Clear cache
 lob --clear-cache
+```
+
+### Performance Statistics
+
+```bash
+# Show execution statistics (opt-in)
+lob data.txt '_.filter(|x| x.len() > 10).count()' --stats
+# Output:
+# 45231
+#
+# Statistics:
+#   Compilation time: 115.75µs
+#   Execution time:   67.96ms
+#   Total time:       68.07ms
+#   Cache:            Hit (binary reused)
 ```
 
 ### Debug Mode
