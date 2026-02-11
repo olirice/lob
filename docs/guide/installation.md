@@ -15,28 +15,28 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 Or visit [https://rustup.rs/](https://rustup.rs/) for other installation methods.
 
-## Install flu
+## Install lob
 
 ### From Source (Recommended)
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/flu.git
-cd flu
+git clone https://github.com/olirice/lob.git
+cd lob
 
 # Build and install
-cargo install --path crates/flu-cli
+cargo install --path crates/lob-cli
 
 # Verify installation
-flu --version
+lob --version
 ```
 
 ### Build for Development
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/flu.git
-cd flu
+git clone https://github.com/olirice/lob.git
+cd lob
 
 # Build in debug mode
 cargo build
@@ -44,24 +44,17 @@ cargo build
 # Run tests
 cargo test --all
 
-# Run flu in dev mode
+# Run lob in dev mode
 cargo run -- '_.take(5)'
-```
-
-### Set Up Git Hooks (for contributors)
-
-```bash
-# Enable pre-commit hooks for formatting, linting, and testing
-./scripts/setup-hooks.sh
 ```
 
 ## Verify Installation
 
-Test that flu is working correctly:
+Test that lob is working correctly:
 
 ```bash
 # Simple test
-echo -e "hello\nworld" | flu '_.map(|x| x.to_uppercase())'
+echo -e "hello\nworld" | lob '_.map(|x| x.to_uppercase())'
 
 # Should output:
 # "HELLO"
@@ -92,7 +85,7 @@ rustup update stable
 On Unix systems, ensure the binary is executable:
 
 ```bash
-chmod +x ~/.cargo/bin/flu
+chmod +x ~/.cargo/bin/lob
 ```
 
 ## Next Steps

@@ -1,6 +1,6 @@
 # API Overview
 
-flu provides a fluent API for data pipeline operations, inspired by Python's flupy with Rust's type safety and performance.
+lob provides a lobent API for data pipeline operations, inspired by Python's lobpy with Rust's type safety and performance.
 
 ## Design Philosophy
 
@@ -18,7 +18,7 @@ _.filter(|x| x.len() > 5)
 
 ### Type Safety
 
-flu leverages Rust's type system for safety:
+lob leverages Rust's type system for safety:
 
 ```rust
 // Type checking at compile time
@@ -28,7 +28,7 @@ _.map(|x| x.parse::<i32>().unwrap())  // String -> i32
 
 ### Zero-Cost Abstractions
 
-flu uses Rust's iterator protocol, providing native performance with no overhead.
+lob uses Rust's iterator protocol, providing native performance with no overhead.
 
 ## Operation Categories
 
@@ -43,7 +43,7 @@ Filter and slice the data stream:
 - [`drop_while`](selection.md#drop-while) - Drop while condition is true
 - [`unique`](selection.md#unique) - Keep only unique elements
 
-[Learn more â†’](selection.md)
+[Learn more †](selection.md)
 
 ### Transformation Operations
 
@@ -54,7 +54,7 @@ Transform elements one-by-one:
 - [`zip`](transformation.md#zip) - Combine with another iterator
 - [`flatten`](transformation.md#flatten) - Flatten nested structures
 
-[Learn more â†’](transformation.md)
+[Learn more †](transformation.md)
 
 ### Grouping Operations
 
@@ -64,7 +64,7 @@ Group elements into chunks:
 - [`window`](grouping.md#window) - Sliding windows
 - [`group_by`](grouping.md#group-by) - Group by key function
 
-[Learn more â†’](grouping.md)
+[Learn more †](grouping.md)
 
 ### Join Operations
 
@@ -73,7 +73,7 @@ Combine two data streams:
 - [`join_inner`](joins.md#inner-join) - Inner join
 - [`join_left`](joins.md#left-join) - Left join
 
-[Learn more â†’](joins.md)
+[Learn more †](joins.md)
 
 ### Terminal Operations
 
@@ -89,7 +89,7 @@ Consume the iterator and produce a result:
 - [`fold`](terminal.md#fold) - Fold with initial value
 - [`any`](terminal.md#any) / [`all`](terminal.md#all) - Check conditions
 
-[Learn more â†’](terminal.md)
+[Learn more †](terminal.md)
 
 ## Input Sources
 
@@ -98,15 +98,15 @@ Consume the iterator and produce a result:
 Use `_` to read from stdin:
 
 ```bash
-cat file.txt | flu '_.take(10)'
+cat file.txt | lob '_.take(10)'
 ```
 
 ### In-memory Data
 
-Use `flu()` helper:
+Use `lob()` helper:
 
 ```bash
-flu 'flu(vec![1, 2, 3]).sum::<i32>()'
+lob 'lob(vec![1, 2, 3]).sum::<i32>()'
 ```
 
 ### Ranges
@@ -114,7 +114,7 @@ flu 'flu(vec![1, 2, 3]).sum::<i32>()'
 Use `range()` helper:
 
 ```bash
-flu 'range(0, 100).filter(|x| x % 2 == 0).count()'
+lob 'range(0, 100).filter(|x| x % 2 == 0).count()'
 ```
 
 ## Chaining Operations

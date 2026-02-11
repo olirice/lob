@@ -1,21 +1,21 @@
 # CLI Usage
 
-Complete reference for the flu command-line interface.
+Complete reference for lob command-line interface.
 
 ## Basic Syntax
 
 ```bash
-flu [OPTIONS] <EXPRESSION>
+lob [OPTIONS] <EXPRESSION>
 ```
 
 ## Arguments
 
 ### `<EXPRESSION>`
 
-The flu expression to execute. Must be quoted to prevent shell interpretation.
+The lob expression to execute. Must be quoted to prevent shell interpretation.
 
 ```bash
-flu '_.filter(|x| x.len() > 5)'
+lob '_.filter(|x| x.len() > 5)'
 ```
 
 ## Options
@@ -25,12 +25,12 @@ flu '_.filter(|x| x.len() > 5)'
 Display the generated Rust source code without executing it.
 
 ```bash
-flu --show-source '_.take(3)'
+lob --show-source '_.take(3)'
 ```
 
 Output:
 ```rust
-use flu_prelude::*;
+use lob_prelude::*;
 
 fn main() {
     let stdin_data = input();
@@ -46,7 +46,7 @@ fn main() {
 Show cache statistics including number of cached binaries and total size.
 
 ```bash
-flu --cache-stats
+lob --cache-stats
 ```
 
 Output:
@@ -54,7 +54,7 @@ Output:
 Cache statistics:
   Cached binaries: 5
   Total size: 2.34 MB
-  Cache directory: "/Users/you/.cache/flu"
+  Cache directory: "/Users/you/.cache/lob"
 ```
 
 ### `--clear-cache`
@@ -62,7 +62,7 @@ Cache statistics:
 Clear all cached compiled binaries.
 
 ```bash
-flu --clear-cache
+lob --clear-cache
 ```
 
 ### `--verbose` / `-v`
@@ -70,7 +70,7 @@ flu --clear-cache
 Enable verbose output showing compilation and execution details.
 
 ```bash
-flu -v '_.take(3)'
+lob -v '_.take(3)'
 ```
 
 ### `--version`
@@ -78,7 +78,7 @@ flu -v '_.take(3)'
 Display version information.
 
 ```bash
-flu --version
+lob --version
 ```
 
 ### `--help` / `-h`
@@ -86,18 +86,18 @@ flu --version
 Display help information.
 
 ```bash
-flu --help
+lob --help
 ```
 
 ## Input/Output
 
 ### Standard Input
 
-flu reads from stdin by default when using `_`:
+lob reads from stdin by default when using `_`:
 
 ```bash
-cat file.txt | flu '_.take(10)'
-seq 1 100 | flu '_.filter(|x| x.parse::<i32>().unwrap() % 2 == 0)'
+cat file.txt | lob '_.take(10)'
+seq 1 100 | lob '_.filter(|x| x.parse::<i32>().unwrap() % 2 == 0)'
 ```
 
 ### Standard Output
@@ -106,37 +106,37 @@ Results are printed to stdout:
 
 ```bash
 # Redirect output to file
-cat input.txt | flu '_.filter(|x| x.contains("ERROR"))' > errors.txt
+cat input.txt | lob '_.filter(|x| x.contains("ERROR"))' > errors.txt
 
 # Pipe to another command
-seq 1 100 | flu '_.take(10)' | wc -l
+seq 1 100 | lob '_.take(10)' | wc -l
 ```
 
 ### Working Without stdin
 
-Use `flu()` helper for in-memory data:
+Use `lob()` helper for in-memory data:
 
 ```bash
-flu 'flu(vec![1, 2, 3]).map(|x| x * 2).to_list()'
+lob 'lob(vec![1, 2, 3]).map(|x| x * 2).to_list()'
 ```
 
 ## Cache Location
 
 Cache location varies by platform:
 
-- **Linux**: `~/.cache/flu/`
-- **macOS**: `~/Library/Caches/flu/`
-- **Windows**: `%LOCALAPPDATA%\flu\cache\`
+- **Linux**: `~/.cache/lob/`
+- **macOS**: `~/Library/Caches/lob/`
+- **Windows**: `%LOCALAPPDATA%\lob\cache\`
 
 Cache structure:
 ```
-flu/
-├── binaries/          # Compiled executables
-│   ├── a3f2e1b...    # Hash of source code
-│   └── b7c4d9a...
-└── sources/           # Generated source (for debugging)
-    ├── a3f2e1b.rs
-    └── b7c4d9a.rs
+lob/
+ binaries/          # Compiled executables
+�    a3f2e1b...    # Hash of source code
+�    b7c4d9a...
+ sources/           # Generated source (for debugging)
+     a3f2e1b.rs
+     b7c4d9a.rs
 ```
 
 ## Exit Codes
@@ -148,9 +148,9 @@ flu/
 
 ## Environment
 
-flu respects these environment variables:
+lob respects these environment variables:
 
-- `CARGO_MANIFEST_DIR` - Used to locate flu libraries during compilation
+- `CARGO_MANIFEST_DIR` - Used to locate lob libraries during compilation
 
 ## Examples
 
@@ -158,26 +158,26 @@ flu respects these environment variables:
 
 ```bash
 # Test with verbose output
-flu -v '_.take(3)' < input.txt
+lob -v '_.take(3)' < input.txt
 
 # Check generated code
-flu --show-source '_.filter(|x| x.len() > 10)'
+lob --show-source '_.filter(|x| x.len() > 10)'
 
 # Clear cache before testing
-flu --clear-cache
+lob --clear-cache
 
 # Check cache growth
-flu --cache-stats
+lob --cache-stats
 ```
 
 ### Production Use
 
 ```bash
 # Process logs in production
-tail -f /var/log/app.log | flu '_.filter(|x| x.contains("ERROR"))'
+tail -f /var/log/app.log | lob '_.filter(|x| x.contains("ERROR"))'
 
 # One-liner data processing
-cat data.csv | flu '_.skip(1).filter(|x| !x.is_empty()).count()'
+cat data.csv | lob '_.skip(1).filter(|x| !x.is_empty()).count()'
 ```
 
 ## Troubleshooting
@@ -187,7 +187,7 @@ cat data.csv | flu '_.skip(1).filter(|x| !x.is_empty()).count()'
 Use `--show-source` to debug:
 
 ```bash
-flu --show-source '_.map(|x| x.invalid_method())'
+lob --show-source '_.map(|x| x.invalid_method())'
 ```
 
 ### Performance Issues
@@ -195,13 +195,13 @@ flu --show-source '_.map(|x| x.invalid_method())'
 Clear cache if binaries are stale:
 
 ```bash
-flu --clear-cache
+lob --clear-cache
 ```
 
 Check cache size:
 
 ```bash
-flu --cache-stats
+lob --cache-stats
 ```
 
 ### Shell Quoting
@@ -210,8 +210,8 @@ Always quote expressions to prevent shell interpretation:
 
 ```bash
 # Wrong - shell interprets |
-flu _.filter(|x| x > 5)
+lob _.filter(|x| x > 5)
 
 # Correct - quoted
-flu '_.filter(|x| x > 5)'
+lob '_.filter(|x| x > 5)'
 ```

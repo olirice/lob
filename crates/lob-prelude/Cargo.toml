@@ -1,0 +1,14 @@
+[package]
+name = "lob-prelude"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "User-facing prelude for lob data pipelines"
+
+[dependencies]
+lob-core = { workspace = true }
+
+[lints]
+workspace = true

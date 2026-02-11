@@ -1,35 +1,35 @@
-# flu - Embedded Rust Pipeline Tool
+# lob - Embedded Rust Pipeline Tool
 
 A CLI for running Rust data pipeline one-liners with native performance.
 
 ## Features
 
-🦀 **Native Rust Performance** - Compiled pipelines run at native speed
+ **Native Rust Performance** - Compiled pipelines run at native speed
 
-⚡ **Smart Caching** - Compiled expressions cached for instant re-execution
+ **Smart Caching** - Compiled expressions cached for instant re-execution
 
-🔄 **Lazy Evaluation** - Memory-efficient streaming operations
+ **Lazy Evaluation** - Memory-efficient streaming operations
 
-🎯 **Fluent API** - Chainable operations inspired by Python's flupy
+ **Lobent API** - Chainable operations inspired by Python's lobpy
 
-📊 **Rich Operations** - Filter, map, group, join, and 20+ operations
+ **Rich Operations** - Filter, map, group, join, and 20+ operations
 
 ## Quick Example
 
 ```bash
 # Filter log lines containing ERROR
-cat app.log | flu '_.filter(|x| x.contains("ERROR"))'
+cat app.log | lob '_.filter(|x| x.contains("ERROR"))'
 
 # Sum numbers from 1 to 100
-seq 1 100 | flu '_.map(|x| x.parse::<i32>().unwrap()).sum::<i32>()'
+seq 1 100 | lob '_.map(|x| x.parse::<i32>().unwrap()).sum::<i32>()'
 
 # Take first 5 unique items
-cat file.txt | flu '_.unique().take(5)'
+cat file.txt | lob '_.unique().take(5)'
 ```
 
 ## How It Works
 
-1. **Code Generation**: Your flu expression is transformed into a complete Rust program
+1. **Code Generation**: Your lob expression is transformed into a complete Rust program
 2. **Compilation**: The program is compiled using rustc with full optimization
 3. **Caching**: Compiled binaries are cached by content hash for instant reuse
 4. **Execution**: Cached binaries execute with native performance
@@ -37,7 +37,7 @@ cat file.txt | flu '_.unique().take(5)'
 ```rust
 // Expression: _.filter(|x| x.len() > 5).take(3)
 // Generates:
-use flu_prelude::*;
+use lob_prelude::*;
 
 fn main() {
     let stdin_data = input();

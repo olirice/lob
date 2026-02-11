@@ -1,8 +1,8 @@
-site_name: flu - Embedded Rust Pipeline Tool
+site_name: lob - Embedded Rust Pipeline Tool
 site_description: A CLI for running Rust data pipeline one-liners with native performance
-site_author: flu contributors
-repo_url: https://github.com/your-org/flu
-repo_name: your-org/flu
+site_author: lob contributors
+repo_url: https://github.com/olirice/lob
+repo_name: olirice/lob
 
 theme:
   name: material
@@ -66,4 +66,4 @@ plugins:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/your-org/flu
+      link: https://github.com/olirice/lob

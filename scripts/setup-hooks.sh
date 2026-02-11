@@ -3,12 +3,12 @@
 
 set -e
 
-echo "Setting up git hooks for flu..."
+echo "Setting up git hooks for lob..."
 
 # Set git hooks path
 git config core.hooksPath .githooks
 
-echo "✅ Git hooks configured successfully!"
+echo " Git hooks configured successfully!"
 echo ""
 echo "Pre-commit hooks will now run automatically:"
 echo "  - Code formatting check (cargo fmt)"

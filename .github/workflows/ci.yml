@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [master, develop]
 
 env:
   RUST_BACKTRACE: 1
@@ -85,12 +85,12 @@ jobs:
       - name: Test binary
         if: runner.os != 'Windows'
         run: |
-          echo "hello" | ./target/release/flu '_.map(|x| x.to_uppercase())'
+          echo "hello" | ./target/release/lob '_.map(|x| x.to_uppercase())'
 
       - name: Test binary (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo "hello" | .\target\release\flu.exe '_.map(|x| x.to_uppercase())'
+          echo "hello" | .\target\release\lob.exe '_.map(|x| x.to_uppercase())'
 
   coverage:
     name: Code Coverage

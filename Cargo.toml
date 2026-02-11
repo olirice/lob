@@ -1,21 +1,21 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/flu-cli",
-    "crates/flu-core",
-    "crates/flu-prelude",
+    "crates/lob-cli",
+    "crates/lob-core",
+    "crates/lob-prelude",
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["flu contributors"]
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/your-org/flu"
+authors = ["lob contributors"]
+license = "MIT"
+repository = "https://github.com/olirice/lob"
 
 [workspace.dependencies]
-flu-core = { path = "crates/flu-core" }
-flu-prelude = { path = "crates/flu-prelude" }
+lob-core = { path = "crates/lob-core" }
+lob-prelude = { path = "crates/lob-prelude" }
 
 # Core dependencies
 itertools = "0.12"
@@ -30,6 +30,7 @@ tar = "0.4"
 zstd = "0.13"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+colored = "2.1"
 
 # Build dependencies
 reqwest = { version = "0.11", features = ["blocking", "rustls-tls"], default-features = false }
