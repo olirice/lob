@@ -18,7 +18,7 @@ lob-core = { path = "crates/lob-core" }
 lob-prelude = { path = "crates/lob-prelude" }
 
 # Core dependencies
-itertools = "0.12"
+itertools = "0.14"
 anyhow = "1.0"
 thiserror = "1.0"
 
