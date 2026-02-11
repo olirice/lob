@@ -165,6 +165,51 @@ fn left_join_empty_left() {
 }
 
 #[test]
+fn inner_join_with_iteration() {
+    // Test that explicitly iterates through results one by one
+    let left = vec![(1, "a"), (2, "b"), (3, "c")];
+    let right = vec![(1, "x"), (2, "y"), (2, "z")];
+
+    let mut iter = left
+        .into_iter()
+        .lob()
+        .join_inner(right, |x| x.0, |x| x.0)
+        .into_iter();
+
+    let first = iter.next();
+    assert!(first.is_some());
+
+    let second = iter.next();
+    assert!(second.is_some());
+
+    let third = iter.next();
+    assert!(third.is_some());
+
+    let fourth = iter.next();
+    assert!(fourth.is_none());
+}
+
+#[test]
+fn left_join_with_iteration() {
+    // Test that explicitly iterates through results one by one
+    let left = vec![(1, "a"), (2, "b"), (3, "c")];
+    let right = vec![(1, "x"), (2, "y")];
+
+    let iter = left
+        .into_iter()
+        .lob()
+        .join_left(right, |x| x.0, |x| x.0)
+        .into_iter();
+
+    // Should get all left items
+    let mut count = 0;
+    for _ in iter {
+        count += 1;
+    }
+    assert_eq!(count, 3);
+}
+
+#[test]
 fn left_join_empty_right() {
     let left = vec![(1, "a"), (2, "b")];
     let right: Vec<(i32, &str)> = vec![];

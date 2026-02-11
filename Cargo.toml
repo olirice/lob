@@ -60,7 +60,7 @@ nonminimal_bool = "allow"
 to_string_in_format_args = "allow"
 redundant_closure_for_method_calls = "allow"
 struct_excessive_bools = "allow"
-deprecated = "allow"
+cargo_common_metadata = "allow"
 if_not_else = "allow"
 literal_string_with_formatting_args = "allow"
 

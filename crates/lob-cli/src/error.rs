@@ -1,5 +1,6 @@
 //! Error types for lob CLI
 
+use crate::suggestion;
 use colored::Colorize;
 use thiserror::Error;
 
@@ -51,6 +52,18 @@ impl LobError {
                 "Your expression:".cyan().bold(),
                 expr.yellow()
             ));
+            output.push(String::new());
+        }
+
+        // Show helpful suggestions for common errors
+        if let Some(sug) = suggestion::get_suggestion(stderr, user_expression) {
+            output.push(format!("  {}", "Problem:".red().bold()));
+            output.push(format!("    {}", sug.problem));
+            output.push(String::new());
+            output.push(format!("  {}", "How to fix:".blue().bold()));
+            for fix in sug.fixes {
+                output.push(format!("    • {}", fix));
+            }
             output.push(String::new());
         }
 
@@ -148,5 +161,211 @@ impl LobError {
             }
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_error_with_user_expression() {
+        let stderr = "error: expected `;`";
+        let formatted = LobError::format_compilation_error(stderr, Some("_.map(|x| x"));
+
+        assert!(formatted.contains("Your expression:"));
+        assert!(formatted.contains("_.map(|x| x"));
+        assert!(formatted.contains("error: expected `;`"));
+    }
+
+    #[test]
+    fn format_error_without_user_expression() {
+        let stderr = "error: something went wrong";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(!formatted.contains("Your expression:"));
+        assert!(formatted.contains("error: something went wrong"));
+    }
+
+    #[test]
+    fn format_error_with_suggestion() {
+        let stderr = "error: mismatched types: expected `&String`, found integer";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("Problem:"));
+        assert!(formatted.contains("How to fix:"));
+    }
+
+    #[test]
+    fn format_error_with_code_line() {
+        let stderr = "error: test\n  12 | let x = y;";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("let x = y;"));
+    }
+
+    #[test]
+    fn format_error_with_caret_line() {
+        let stderr = "error: test\n       ^^^^^^";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("^^^^^^"));
+    }
+
+    #[test]
+    fn format_error_with_help() {
+        let stderr = "error: test\n  = help: try this instead";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("= help: try this instead"));
+    }
+
+    #[test]
+    fn format_error_with_note() {
+        let stderr = "error: test\n  = note: some context";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("= note: some context"));
+    }
+
+    #[test]
+    fn format_error_with_aborting() {
+        let stderr = "error: aborting due to previous error";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("aborting due to previous error"));
+    }
+
+    #[test]
+    fn format_error_with_location() {
+        let stderr = "  --> /path/to/file.rs:10:5";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("file.rs:10:5"));
+        assert!(!formatted.contains("/path/to/"));
+    }
+
+    #[test]
+    fn simplify_error_location_basic() {
+        let line = "  --> /some/long/path/source.rs:12:5";
+        let result = LobError::simplify_error_location(line);
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "--> source.rs:12:5");
+    }
+
+    #[test]
+    fn simplify_error_location_no_arrow() {
+        let line = "some line without arrow";
+        let result = LobError::simplify_error_location(line);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn simplify_error_location_no_colon() {
+        let line = "  --> path_without_colon";
+        let result = LobError::simplify_error_location(line);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn format_error_with_warning() {
+        let stderr = "warning: unused variable";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("warning: unused variable"));
+    }
+
+    #[test]
+    fn format_error_with_continuation_line() {
+        let stderr = "error: test\n  | something";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("something"));
+    }
+
+    #[test]
+    fn format_error_multiline() {
+        let stderr = "error[E0308]: mismatched types\n  --> file.rs:1:1\n   |\n 1 | let x: i32 = \"string\";\n   |              ^^^^^^^^ expected `i32`, found `&str`";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("mismatched types"));
+        assert!(formatted.contains("file.rs:1:1"));
+        assert!(formatted.contains("let x: i32"));
+    }
+
+    #[test]
+    fn format_error_blank_lines() {
+        let stderr = "error: test\n\n\nanother line";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("error: test"));
+        assert!(formatted.contains("another line"));
+    }
+
+    #[test]
+    fn format_error_could_not_compile() {
+        let stderr = "error: could not compile `project` due to 1 previous error";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("could not compile"));
+    }
+
+    #[test]
+    fn format_error_location_no_simplify() {
+        // Location line that can't be simplified (no colon after arrow)
+        let stderr = "  --> invalid-path-format";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        // Should still include the line even if not simplified
+        assert!(formatted.contains("invalid-path-format"));
+    }
+
+    #[test]
+    fn format_error_pipe_without_line_number() {
+        // Pipe line without a line number
+        let stderr = "error: test\n  | annotation line here";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("annotation line here"));
+    }
+
+    #[test]
+    fn format_error_pipe_line_stripped() {
+        // Test stripped pipe format
+        let stderr = "error: test\n |more content";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("more content"));
+    }
+
+    #[test]
+    fn format_error_numbered_code_line() {
+        // Code line with valid line number
+        let stderr = "error: test\n   12| let x = y;";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("let x = y"));
+    }
+
+    #[test]
+    fn format_error_pipe_only() {
+        // Just a pipe line without number
+        let stderr = "error: test\n   |";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        // Should be handled without panic
+        assert!(formatted.contains("Compilation Error"));
+    }
+
+    #[test]
+    fn format_error_aborting_due_to() {
+        // Full "aborting due to" message
+        let stderr = "error: aborting due to 2 previous errors";
+        let formatted = LobError::format_compilation_error(stderr, None);
+
+        assert!(formatted.contains("aborting due to"));
     }
 }

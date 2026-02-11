@@ -9,13 +9,20 @@ mod cache;
 mod codegen;
 mod compile;
 mod error;
+mod input;
+mod output;
+mod suggestion;
 mod toolchain;
+mod welcome;
 
 use cache::Cache;
 use clap::Parser;
 use codegen::CodeGenerator;
 use compile::Compiler;
 use error::{LobError, Result};
+use input::{InputFormat, InputSource};
+use output::OutputFormat;
+use std::path::PathBuf;
 use std::process::Command;
 use toolchain::EmbeddedToolchain;
 
@@ -26,8 +33,29 @@ use toolchain::EmbeddedToolchain;
 #[command(version)]
 struct Args {
     /// Lob expression to execute
-    #[arg(value_name = "EXPRESSION")]
+    #[arg(value_name = "EXPRESSION", required_unless_present_any = ["show_source", "clear_cache", "cache_stats"])]
     expression: Option<String>,
+
+    /// Input files (omit to read from stdin)
+    #[arg(value_name = "FILE")]
+    files: Vec<PathBuf>,
+
+    /// Parse input as CSV with headers (row is `HashMap<String, String>`)
+    #[arg(long)]
+    parse_csv: bool,
+
+    /// Parse input as TSV with headers
+    #[arg(long)]
+    parse_tsv: bool,
+
+    /// Parse input as JSON lines
+    #[arg(long)]
+    parse_json: bool,
+
+    /// Output format
+    #[arg(short = 'f', long, value_name = "FORMAT")]
+    #[arg(value_parser = ["debug", "json", "jsonl", "csv"])]
+    format: Option<String>,
 
     /// Show generated source code without executing
     #[arg(short = 's', long)]
@@ -107,14 +135,45 @@ fn run() -> Result<()> {
         return Ok(());
     }
 
-    // Get expression or show help
-    let expression = args.expression.ok_or_else(|| {
-        LobError::InvalidExpression("No expression provided. Use --help for usage.".to_string())
-    })?;
+    // Show welcome message if no expression and stdin is a terminal
+    if args.expression.is_none() {
+        if args.files.is_empty() && atty::is(atty::Stream::Stdin) {
+            welcome::print_welcome();
+            return Ok(());
+        }
+        return Err(LobError::InvalidExpression(
+            "No expression provided. Use --help for usage.".to_string(),
+        ));
+    }
+
+    let expression = args.expression.unwrap();
+
+    // Determine input format
+    let input_format = if args.parse_csv {
+        InputFormat::Csv
+    } else if args.parse_tsv {
+        InputFormat::Tsv
+    } else if args.parse_json {
+        InputFormat::JsonLines
+    } else {
+        InputFormat::Lines
+    };
+
+    // Create input source
+    let input_source = InputSource::new(args.files.clone(), input_format);
+    input_source.validate()?;
+
+    // Determine output format
+    let output_format = if let Some(ref fmt) = args.format {
+        OutputFormat::from_str(fmt)
+            .ok_or_else(|| LobError::InvalidExpression(format!("Unknown output format: {}", fmt)))?
+    } else {
+        OutputFormat::default(output::is_terminal())
+    };
 
     // Generate code
     let expression_clone = expression.clone();
-    let generator = CodeGenerator::new(expression);
+    let generator = CodeGenerator::new(expression, input_source.clone(), output_format);
     let source = generator.generate()?;
 
     if args.show_source {
@@ -138,8 +197,15 @@ fn run() -> Result<()> {
         eprintln!("Executing...");
     }
 
-    // Execute the compiled binary, passing stdin through
-    let mut child = Command::new(&binary_path)
+    // Execute the compiled binary
+    let mut cmd = Command::new(&binary_path);
+
+    // Pass files as arguments if any
+    if !input_source.is_stdin() {
+        cmd.args(&input_source.files);
+    }
+
+    let mut child = cmd
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())

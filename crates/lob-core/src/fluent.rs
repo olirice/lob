@@ -676,4 +676,13 @@ mod tests {
         assert_eq!((1..=5).lob().min(), Some(1));
         assert_eq!((1..=5).lob().max(), Some(5));
     }
+
+    #[test]
+    fn into_iterator_for_loop() {
+        let mut result = Vec::new();
+        for item in (0..5).lob().map(|x| x * 2) {
+            result.push(item);
+        }
+        assert_eq!(result, vec![0, 2, 4, 6, 8]);
+    }
 }

@@ -137,6 +137,8 @@ impl CacheStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
+    use std::io::Write;
 
     #[test]
     fn hash_consistency() {
@@ -156,17 +158,203 @@ mod tests {
     }
 
     #[test]
-    fn format_size() {
+    fn cache_dir_returns_path() {
+        let cache = Cache::new().unwrap();
+        let dir = cache.cache_dir();
+        assert!(dir.to_string_lossy().contains("lob"));
+    }
+
+    #[test]
+    fn get_binary_cache_miss() {
+        let cache = Cache::new().unwrap();
+        let result = cache.get_binary("nonexistent_hash_12345");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn get_binary_cache_hit() {
+        let cache = Cache::new().unwrap();
+        let hash = "test_hash_binary_unique_xyz";
+
+        // Ensure binaries directory exists (might have been removed by concurrent test)
+        let _ = fs::create_dir_all(cache.cache_dir().join("binaries"));
+
+        // Create a fake binary file
+        let binary_path = cache.binary_path(hash);
+        File::create(&binary_path).unwrap();
+
+        // Should find it now
+        let result = cache.get_binary(hash);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), binary_path);
+
+        // Cleanup
+        let _ = fs::remove_file(&binary_path);
+    }
+
+    #[test]
+    fn store_source() {
+        let cache = Cache::new().unwrap();
+        let hash = "test_source_hash";
+        let source = "fn main() {}";
+
+        let path = cache.store_source(hash, source).unwrap();
+        assert!(path.exists());
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert_eq!(content, source);
+
+        // Cleanup
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn binary_path() {
+        let cache = Cache::new().unwrap();
+        let hash = "test_hash";
+        let path = cache.binary_path(hash);
+
+        assert!(path.to_string_lossy().contains("binaries"));
+        assert!(path.to_string_lossy().contains(hash));
+    }
+
+    #[test]
+    fn source_path() {
+        let cache = Cache::new().unwrap();
+        let hash = "test_hash";
+        let path = cache.source_path(hash);
+
+        assert!(path.to_string_lossy().contains("sources"));
+        assert!(path.to_string_lossy().contains(hash));
+        assert!(path.to_string_lossy().ends_with(".rs"));
+    }
+
+    #[test]
+    fn clear_cache() {
+        let cache = Cache::new().unwrap();
+
+        // Add some test files (directories already created by Cache::new())
+        let hash1 = "clear_test_unique_1a";
+        let hash2 = "clear_test_unique_2b";
+
+        cache.store_source(hash1, "test1").unwrap();
+        cache.store_source(hash2, "test2").unwrap();
+
+        File::create(cache.binary_path(hash1)).unwrap();
+        File::create(cache.binary_path(hash2)).unwrap();
+
+        // Verify files exist
+        assert!(cache.get_binary(hash1).is_some());
+        assert!(cache.get_binary(hash2).is_some());
+
+        // Clear cache
+        cache.clear().unwrap();
+
+        // Files should be gone
+        assert!(cache.get_binary(hash1).is_none());
+        assert!(cache.get_binary(hash2).is_none());
+    }
+
+    #[test]
+    fn clear_cache_empty() {
+        let cache = Cache::new().unwrap();
+
+        // Ensure directories exist before clearing
+        let _ = fs::create_dir_all(cache.cache_dir().join("binaries"));
+        let _ = fs::create_dir_all(cache.cache_dir().join("sources"));
+
+        // Clear cache should work
+        let result = cache.clear();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn stats_empty_cache() {
+        let cache = Cache::new().unwrap();
+
+        // Ensure directories exist
+        let _ = fs::create_dir_all(cache.cache_dir().join("binaries"));
+
+        // Should succeed even if cache is empty
+        let result = cache.stats();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn stats_with_binaries() {
+        let cache = Cache::new().unwrap();
+
+        // Ensure binaries directory exists (might have been removed by concurrent test)
+        let _ = fs::create_dir_all(cache.cache_dir().join("binaries"));
+
+        // Create test binaries
+        let hash1 = "stats_test_binaries_unique_abc";
+        let hash2 = "stats_test_binaries_unique_def";
+
+        let path1 = cache.binary_path(hash1);
+        let path2 = cache.binary_path(hash2);
+
+        // These might fail if directory was removed by concurrent test
+        if let Ok(mut file1) = File::create(&path1) {
+            let _ = file1.write_all(b"test data 1");
+        }
+        if let Ok(mut file2) = File::create(&path2) {
+            let _ = file2.write_all(b"test data 2");
+        }
+
+        // Stats should work even if files weren't created
+        let result = cache.stats();
+        assert!(result.is_ok());
+
+        // Cleanup
+        let _ = fs::remove_file(&path1);
+        let _ = fs::remove_file(&path2);
+    }
+
+    #[test]
+    fn format_size_bytes() {
+        let stats = CacheStats {
+            binary_count: 1,
+            total_size: 500,
+        };
+        assert_eq!(stats.format_size(), "500 B");
+    }
+
+    #[test]
+    fn format_size_kb() {
         let stats = CacheStats {
             binary_count: 10,
             total_size: 1024,
         };
         assert_eq!(stats.format_size(), "1.00 KB");
+    }
 
+    #[test]
+    fn format_size_mb() {
         let stats = CacheStats {
             binary_count: 10,
             total_size: 1024 * 1024,
         };
         assert_eq!(stats.format_size(), "1.00 MB");
+    }
+
+    #[test]
+    fn format_size_gb() {
+        let stats = CacheStats {
+            binary_count: 10,
+            total_size: 1024 * 1024 * 1024,
+        };
+        assert_eq!(stats.format_size(), "1.00 GB");
+    }
+
+    #[test]
+    fn format_size_large_mb() {
+        let stats = CacheStats {
+            binary_count: 10,
+            total_size: 500 * 1024 * 1024, // 500 MB
+        };
+        let formatted = stats.format_size();
+        assert!(formatted.contains("MB"));
+        assert!(formatted.contains("500"));
     }
 }

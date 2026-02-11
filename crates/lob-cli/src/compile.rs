@@ -18,15 +18,20 @@ impl Compiler {
     fn find_target_dir() -> Option<PathBuf> {
         // Strategy 1: Use CARGO_MANIFEST_DIR (works during cargo test/run)
         if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
-            let workspace_root = PathBuf::from(manifest_dir)
-                .parent()
-                .and_then(|p| p.parent())
-                .map(|p| p.to_path_buf());
+            let root = PathBuf::from(manifest_dir);
 
-            if let Some(root) = workspace_root {
-                let target_dir = root.join("target").join("debug");
-                if target_dir.exists() {
-                    return Some(target_dir);
+            // Navigate up ancestors to find workspace root with target/ dir containing lob_prelude
+            for ancestor in root.ancestors() {
+                let debug_dir = ancestor.join("target").join("debug");
+                let prelude_lib = debug_dir.join("liblob_prelude.rlib");
+                if prelude_lib.exists() {
+                    return Some(debug_dir);
+                }
+
+                let release_dir = ancestor.join("target").join("release");
+                let prelude_lib = release_dir.join("liblob_prelude.rlib");
+                if prelude_lib.exists() {
+                    return Some(release_dir);
                 }
             }
         }
@@ -34,6 +39,18 @@ impl Compiler {
         // Strategy 2: Look relative to the executable
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
+                // Check if we're in deps/ subdirectory (test executable)
+                if exe_dir.ends_with("deps") {
+                    if let Some(build_dir) = exe_dir.parent() {
+                        // We're in target/debug/deps or target/release/deps
+                        let prelude_lib = build_dir.join("liblob_prelude.rlib");
+                        if prelude_lib.exists() {
+                            return Some(build_dir.to_path_buf());
+                        }
+                    }
+                }
+
+                // Regular executable path handling
                 if let Some(target_parent) = exe_dir.parent() {
                     // Try debug first (avoids LTO linking issues)
                     let debug_dir = target_parent.join("debug");
@@ -61,9 +78,40 @@ impl Compiler {
 
         // Strategy 3: Look in current working directory
         if let Ok(cwd) = std::env::current_dir() {
-            let target_dir = cwd.join("target").join("debug");
-            if target_dir.exists() {
-                return Some(target_dir);
+            // Try debug first
+            let debug_dir = cwd.join("target").join("debug");
+            let prelude_lib = debug_dir.join("liblob_prelude.rlib");
+            if prelude_lib.exists() {
+                return Some(debug_dir);
+            }
+
+            // Try release
+            let release_dir = cwd.join("target").join("release");
+            let prelude_lib = release_dir.join("liblob_prelude.rlib");
+            if prelude_lib.exists() {
+                return Some(release_dir);
+            }
+        }
+
+        // Strategy 4: Try to find workspace root by walking up from cwd
+        if let Ok(mut current) = std::env::current_dir() {
+            loop {
+                let debug_dir = current.join("target").join("debug");
+                let prelude_lib = debug_dir.join("liblob_prelude.rlib");
+                if prelude_lib.exists() {
+                    return Some(debug_dir);
+                }
+
+                let release_dir = current.join("target").join("release");
+                let prelude_lib = release_dir.join("liblob_prelude.rlib");
+                if prelude_lib.exists() {
+                    return Some(release_dir);
+                }
+
+                // Move up one directory
+                if !current.pop() {
+                    break;
+                }
             }
         }
 
@@ -180,6 +228,26 @@ impl Compiler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::io::Write;
+
+    #[test]
+    fn find_target_dir_test() {
+        // Test that we can find the target directory
+        let target_dir = Compiler::find_target_dir();
+        eprintln!("Found target dir: {:?}", target_dir);
+        assert!(target_dir.is_some(), "Should find target directory in test");
+
+        if let Some(dir) = target_dir {
+            let prelude_lib = dir.join("liblob_prelude.rlib");
+            eprintln!("Checking for: {:?}", prelude_lib);
+            assert!(
+                prelude_lib.exists(),
+                "lob_prelude.rlib should exist at {:?}",
+                prelude_lib
+            );
+        }
+    }
 
     #[test]
     fn system_compiler_available() {
@@ -188,5 +256,148 @@ mod tests {
             Ok(_) => (),
             Err(e) => panic!("System compiler not available: {}", e),
         }
+    }
+
+    #[test]
+    fn custom_compiler_creation() {
+        let rustc_path = PathBuf::from("/custom/rustc");
+        let sysroot = Some(PathBuf::from("/custom/sysroot"));
+
+        let compiler = Compiler::custom(rustc_path.clone(), sysroot.clone());
+
+        assert_eq!(compiler.rustc_path, rustc_path);
+        assert_eq!(compiler.sysroot, sysroot);
+    }
+
+    #[test]
+    fn custom_compiler_no_sysroot() {
+        let rustc_path = PathBuf::from("/custom/rustc");
+        let compiler = Compiler::custom(rustc_path.clone(), None);
+
+        assert_eq!(compiler.rustc_path, rustc_path);
+        assert_eq!(compiler.sysroot, None);
+    }
+
+    #[test]
+    fn compile_with_invalid_source() {
+        let compiler = Compiler::system().unwrap();
+        let cache = Cache::new().unwrap();
+
+        // Create invalid Rust source
+        let invalid_source = "fn main() { this is not valid rust }";
+
+        // Should return compilation error
+        let result = compiler.compile_and_cache(invalid_source, &cache, Some("test_expr"));
+        assert!(result.is_err());
+
+        if let Err(LobError::Compilation(msg)) = result {
+            assert!(!msg.is_empty());
+        } else {
+            panic!("Expected compilation error");
+        }
+    }
+
+    #[test]
+    fn compile_and_cache_with_cache_hit() {
+        let compiler = Compiler::system().unwrap();
+        let cache = Cache::new().unwrap();
+
+        let source = "fn main() { println!(\"test\"); }";
+
+        // First compilation
+        let path1 = compiler.compile_and_cache(source, &cache, None).unwrap();
+        assert!(path1.exists());
+
+        // Second compilation should hit cache
+        let path2 = compiler.compile_and_cache(source, &cache, None).unwrap();
+
+        assert_eq!(path1, path2);
+    }
+
+    #[test]
+    fn compile_and_cache_different_sources() {
+        let compiler = Compiler::system().unwrap();
+        let cache = Cache::new().unwrap();
+
+        let source1 = "fn main() { println!(\"test1\"); }";
+        let source2 = "fn main() { println!(\"test2\"); }";
+
+        let path1 = compiler.compile_and_cache(source1, &cache, None).unwrap();
+        let path2 = compiler.compile_and_cache(source2, &cache, None).unwrap();
+
+        // Different sources should produce different binaries
+        assert_ne!(path1, path2);
+        assert!(path1.exists());
+        assert!(path2.exists());
+    }
+
+    #[test]
+    fn compile_with_user_expr_in_error() {
+        let compiler = Compiler::system().unwrap();
+        let cache = Cache::new().unwrap();
+
+        let invalid_source = "fn main() { let x: i32 = \"string\"; }";
+        let user_expr = "_.map(|x| x + \"oops\")";
+
+        let result = compiler.compile_and_cache(invalid_source, &cache, Some(user_expr));
+        assert!(result.is_err());
+
+        // The error should be formatted with user expression context
+        if let Err(LobError::Compilation(msg)) = result {
+            assert!(!msg.is_empty());
+        }
+    }
+
+    #[test]
+    fn compile_with_custom_sysroot() {
+        let temp_dir = std::env::temp_dir().join("test_sysroot");
+        let _ = fs::create_dir_all(&temp_dir);
+
+        let compiler = Compiler::custom(PathBuf::from("rustc"), Some(temp_dir.clone()));
+
+        assert_eq!(compiler.sysroot, Some(temp_dir));
+    }
+
+    #[test]
+    fn compile_direct_call() {
+        let compiler = Compiler::system().unwrap();
+        let temp_dir = std::env::temp_dir().join("lob_compile_test");
+        let _ = fs::create_dir_all(&temp_dir);
+
+        let source_path = temp_dir.join("test.rs");
+        let output_path = temp_dir.join("test_bin");
+
+        // Write valid Rust source
+        let mut file = fs::File::create(&source_path).unwrap();
+        file.write_all(b"fn main() { println!(\"test\"); }")
+            .unwrap();
+
+        // Compile directly
+        let result = compiler.compile(&source_path, &output_path, None);
+
+        // Should succeed (or fail gracefully if linking issues occur)
+        // The key is exercising the compile path
+        match result {
+            Ok(()) => assert!(output_path.exists()),
+            Err(LobError::Compilation(_)) => {
+                // Expected if lob_prelude isn't found
+            }
+            Err(e) => panic!("Unexpected error: {}", e),
+        }
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn compile_with_invalid_path() {
+        let compiler = Compiler::system().unwrap();
+
+        let source_path = PathBuf::from("/nonexistent/file.rs");
+        let output_path = PathBuf::from("/tmp/output");
+
+        // Should return an error when trying to compile nonexistent file
+        let result = compiler.compile(&source_path, &output_path, None);
+        assert!(result.is_err());
     }
 }

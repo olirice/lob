@@ -119,8 +119,8 @@ fn test_enumerate() -> Result<()> {
         .write_stdin("a\nb\nc\n")
         .assert()
         .success()
-        .stdout(predicate::str::contains("(0,"))
-        .stdout(predicate::str::contains("(1,"));
+        .stdout(predicate::str::contains("[0,"))
+        .stdout(predicate::str::contains("[1,"));
     Ok(())
 }
 
@@ -130,6 +130,6 @@ fn test_without_stdin() -> Result<()> {
     cmd.arg("lob(vec![1, 2, 3]).map(|x| x * 2).to_list()")
         .assert()
         .success()
-        .stdout(predicate::str::contains("[2, 4, 6]"));
+        .stdout(predicate::str::contains("[2,4,6]"));
     Ok(())
 }

@@ -35,19 +35,21 @@ cp target/release/lob ~/.local/bin/  # or /usr/local/bin/
 ### Basic Usage
 
 ```bash
-# Filter and count
+# From stdin
 seq 1 100 | lob '_.filter(|x| x.parse::<i32>().unwrap() % 2 == 0).count()'
 # Output: 50
 
-# Map and take first 5
-echo -e "hello\nworld" | lob '_.map(|x| x.to_uppercase()).take(5)'
-# Output:
-# "HELLO"
-# "WORLD"
+# From file
+lob data.txt '_.filter(|x| x.len() > 5).take(10)'
+# Output: First 10 lines longer than 5 characters
 
-# Parse, filter, sum
-seq 1 1000 | lob '_.map(|x| x.parse::<i32>().unwrap()).filter(|&x| x > 500).sum::<i32>()'
-# Output: 375250
+# Multiple files
+lob file1.txt file2.txt '_.unique().count()'
+# Output: Number of unique lines across all files
+
+# Parse CSV
+lob users.csv --parse-csv '_.filter(|r| r["age"].parse::<i32>().unwrap() > 18)'
+# Output: CSV rows where age > 18
 ```
 
 ## Examples
@@ -55,8 +57,9 @@ seq 1 1000 | lob '_.map(|x| x.parse::<i32>().unwrap()).filter(|&x| x > 500).sum:
 ### Log Processing
 
 ```bash
-# Extract error messages
-cat app.log | lob '_.filter(|x| x.contains("ERROR")).take(10)'
+# Extract error messages from file
+lob app.log '_.filter(|x| x.contains("ERROR")).take(10)'
+# Output: First 10 ERROR lines
 
 # Count errors by type
 cat app.log | lob '
@@ -65,6 +68,26 @@ cat app.log | lob '
    .group_by(|x| x.clone())
    .map(|(k, v)| format!("{}: {}", k, v.len()))
 '
+```
+
+### CSV Processing
+
+```bash
+# Filter CSV by column value
+lob users.csv --parse-csv '_.filter(|r| r["status"] == "active")'
+# Output: All active users
+
+# Convert CSV to JSON
+lob data.csv --parse-csv '_.take(100)' --format json > output.json
+
+# Group by column and count
+lob sales.csv --parse-csv '
+  _.group_by(|r| r["category"].clone())
+   .map(|(k, v)| format!("{}: {} items", k, v.len()))
+'
+# Output:
+# "Electronics: 45 items"
+# "Clothing: 32 items"
 ```
 
 ### Data Transformation
@@ -142,6 +165,63 @@ seq 1 1000000 | lob '_.filter(|x| x.parse::<i32>().unwrap() % 2 == 0).count()'
 - `reduce(f)` - Reduce with function
 - `fold(init, f)` - Fold with initial value
 
+## Input Formats
+
+### CSV Parsing
+
+```bash
+# Parse CSV with headers (each row becomes HashMap<String, String>)
+lob data.csv --parse-csv '_.filter(|r| r["age"].parse::<i32>().unwrap() > 18)'
+
+# Access columns by name
+lob users.csv --parse-csv '_.map(|r| format!("{}: {}", r["name"], r["email"]))'
+```
+
+### TSV Parsing
+
+```bash
+# Parse tab-separated values
+lob data.tsv --parse-tsv '_.filter(|r| r["status"] == "active")'
+```
+
+### JSON Lines
+
+```bash
+# Parse newline-delimited JSON
+lob logs.jsonl --parse-json '_.filter(|obj| obj["level"] == "ERROR")'
+```
+
+## Output Formats
+
+### JSON Output
+
+```bash
+# Pretty JSON array
+lob data.csv --parse-csv '_.take(5)' --format json
+# Output:
+# [
+#   {"name": "Alice", "age": "30"},
+#   {"name": "Bob", "age": "25"}
+# ]
+```
+
+### JSON Lines
+
+```bash
+# Newline-delimited JSON (one per line)
+lob data.csv --parse-csv '_.filter(...)' --format jsonl | jq '.name'
+# Output:
+# {"name":"Alice","age":"30"}
+# {"name":"Bob","age":"25"}
+```
+
+### CSV Output
+
+```bash
+# Output as CSV
+lob data.csv --parse-csv '_.filter(|r| r["age"].parse::<i32>().unwrap() > 25)' --format csv
+```
+
 ## Advanced Features
 
 ### Cache Management
@@ -159,6 +239,9 @@ lob --clear-cache
 ```bash
 # Show generated source
 lob --show-source '_.take(5)'
+
+# Show generated source for CSV input
+lob --show-source --parse-csv '_.filter(|r| r["age"] > "25")'
 
 # Verbose output
 lob -v '_.take(5)'

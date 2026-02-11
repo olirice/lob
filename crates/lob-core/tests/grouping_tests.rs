@@ -140,3 +140,41 @@ fn chunk_then_map() {
     let result: Vec<_> = (0..6).lob().chunk(2).map(|chunk| chunk.len()).collect();
     assert_eq!(result, vec![2, 2, 2]);
 }
+
+#[test]
+fn group_by_iterator_exhaustion() {
+    let data = vec![1, 2, 3, 4];
+    let mut groups = data.into_iter().lob().group_by(|x| x % 2).into_iter();
+
+    // Get all groups
+    let all: Vec<_> = groups.by_ref().collect();
+    assert!(!all.is_empty());
+
+    // Iterator should be exhausted
+    assert_eq!(groups.next(), None);
+}
+
+#[test]
+fn group_by_size_hint() {
+    let data = vec![1, 2, 3];
+    let mut groups = data.into_iter().lob().group_by(|x| x % 2).into_iter();
+
+    // Before consuming
+    let (lower, _upper) = groups.size_hint();
+    assert_eq!(lower, 0);
+
+    // After consuming all
+    let _all: Vec<_> = groups.by_ref().collect();
+    let (lower, _upper) = groups.size_hint();
+    assert_eq!(lower, 0);
+    // Upper bound may be None for complex iterators, which is fine
+}
+
+#[test]
+fn window_iterator_size_hint() {
+    let data = vec![1, 2, 3, 4, 5];
+    let windows = data.into_iter().lob().window(3).into_iter();
+
+    let (lower, _upper) = windows.size_hint();
+    assert_eq!(lower, 0);
+}
