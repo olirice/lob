@@ -9,15 +9,22 @@ pub struct CodeGenerator {
     expression: String,
     input_source: InputSource,
     output_format: OutputFormat,
+    enable_stats: bool,
 }
 
 impl CodeGenerator {
     /// Create a new code generator for the given expression
-    pub fn new(expression: String, input_source: InputSource, output_format: OutputFormat) -> Self {
+    pub fn new(
+        expression: String,
+        input_source: InputSource,
+        output_format: OutputFormat,
+        enable_stats: bool,
+    ) -> Self {
         Self {
             expression,
             input_source,
             output_format,
+            enable_stats,
         }
     }
 
@@ -28,6 +35,13 @@ impl CodeGenerator {
         // Add prelude imports
         code.push_str("use lob_prelude::*;\n");
         code.push_str("use std::collections::HashMap;\n");
+
+        // Add stats tracking imports if enabled
+        if self.enable_stats {
+            code.push_str("use std::sync::atomic::{AtomicUsize, Ordering};\n");
+            code.push_str("use std::sync::Arc;\n");
+            code.push_str("use std::time::Instant;\n");
+        }
 
         // Add serde_json import if using JSON output (from lob_prelude re-export)
         if matches!(
@@ -46,12 +60,44 @@ impl CodeGenerator {
         code.push('\n');
         code.push_str("fn main() {\n");
 
+        // Initialize stats tracking if enabled
+        if self.enable_stats {
+            code.push_str("    let start_time = Instant::now();\n");
+            code.push_str("    let item_count = Arc::new(AtomicUsize::new(0));\n");
+            code.push_str("    let last_print = Arc::new(AtomicUsize::new(0));\n");
+            code.push_str("    let print_interval = 10000; // Print every 10k items\n");
+            code.push('\n');
+        }
+
         // Check if expression uses stdin (starts with '_')
         let uses_stdin = self.expression.trim().starts_with('_');
 
         // Generate input based on format and source
         let expression = if uses_stdin {
             self.generate_input(&mut code);
+            if self.enable_stats {
+                // Wrap iterator with stats tracking
+                code.push_str("    let stdin_data = {\n");
+                code.push_str("        let counter = item_count.clone();\n");
+                code.push_str("        let last = last_print.clone();\n");
+                code.push_str("        let start = start_time;\n");
+                code.push_str("        stdin_data.map(move |item| {\n");
+                code.push_str(
+                    "            let count = counter.fetch_add(1, Ordering::Relaxed) + 1;\n",
+                );
+                code.push_str("            let last_val = last.load(Ordering::Relaxed);\n");
+                code.push_str("            if count - last_val >= print_interval {\n");
+                code.push_str("                let elapsed = start.elapsed().as_secs_f64();\n");
+                code.push_str("                let throughput = count as f64 / elapsed;\n");
+                code.push_str(
+                    "                eprintln!(\"\\r[Stats] Items: {} | Throughput: {:.0} items/s | Elapsed: {:.1}s\", count, throughput, elapsed);\n",
+                );
+                code.push_str("                last.store(count, Ordering::Relaxed);\n");
+                code.push_str("            }\n");
+                code.push_str("            item\n");
+                code.push_str("        })\n");
+                code.push_str("    };\n");
+            }
             self.expression.replacen('_', "stdin_data", 1)
         } else {
             self.expression.clone()
@@ -62,6 +108,17 @@ impl CodeGenerator {
 
         // Generate output based on format
         self.generate_output(&mut code);
+
+        // Print final stats if enabled
+        if self.enable_stats {
+            code.push('\n');
+            code.push_str("    let total_items = item_count.load(Ordering::Relaxed);\n");
+            code.push_str("    let elapsed = start_time.elapsed().as_secs_f64();\n");
+            code.push_str("    let throughput = if elapsed > 0.0 { total_items as f64 / elapsed } else { 0.0 };\n");
+            code.push_str(
+                "    eprintln!(\"\\n[Final Stats] Total items: {} | Throughput: {:.0} items/s | Total time: {:.3}s\", total_items, throughput, elapsed);\n",
+            );
+        }
 
         code.push_str("}\n");
 
@@ -227,6 +284,7 @@ mod tests {
             "_.filter(|x| x.contains(\"test\"))".to_string(),
             default_input(),
             OutputFormat::Debug,
+            false,
         );
         let code = gen.generate().unwrap();
 
@@ -242,6 +300,7 @@ mod tests {
             "_.filter(|x| x.len() > 5).count()".to_string(),
             default_input(),
             OutputFormat::Debug,
+            false,
         );
         let code = gen.generate().unwrap();
 
@@ -255,6 +314,7 @@ mod tests {
             "lob(vec![1, 2, 3]).map(|x| x * 2)".to_string(),
             default_input(),
             OutputFormat::Debug,
+            false,
         );
         let code = gen.generate().unwrap();
 
@@ -268,6 +328,7 @@ mod tests {
             "_.filter(|r| r[\"age\"].parse::<i32>().unwrap() > 18)".to_string(),
             InputSource::new(vec![], InputFormat::Csv),
             OutputFormat::Debug,
+            false,
         );
         let code = gen.generate().unwrap();
 
@@ -276,7 +337,12 @@ mod tests {
 
     #[test]
     fn generate_json_output() {
-        let gen = CodeGenerator::new("_.take(5)".to_string(), default_input(), OutputFormat::Json);
+        let gen = CodeGenerator::new(
+            "_.take(5)".to_string(),
+            default_input(),
+            OutputFormat::Json,
+            false,
+        );
         let code = gen.generate().unwrap();
 
         assert!(code.contains("serde_json::to_string_pretty"));
@@ -288,6 +354,7 @@ mod tests {
             "_.take(5)".to_string(),
             InputSource::new(vec![], InputFormat::Tsv),
             OutputFormat::Debug,
+            false,
         );
         let code = gen.generate().unwrap();
 
@@ -300,6 +367,7 @@ mod tests {
             "_.take(5)".to_string(),
             InputSource::new(vec![], InputFormat::JsonLines),
             OutputFormat::Debug,
+            false,
         );
         let code = gen.generate().unwrap();
 
@@ -313,6 +381,7 @@ mod tests {
             "_.count()".to_string(),
             InputSource::new(vec![PathBuf::from("test.csv")], InputFormat::Csv),
             OutputFormat::Debug,
+            false,
         );
         let code = gen.generate().unwrap();
 
@@ -326,6 +395,7 @@ mod tests {
             "_.count()".to_string(),
             InputSource::new(vec![PathBuf::from("test.tsv")], InputFormat::Tsv),
             OutputFormat::Debug,
+            false,
         );
         let code = gen.generate().unwrap();
 
@@ -339,6 +409,7 @@ mod tests {
             "_.count()".to_string(),
             InputSource::new(vec![PathBuf::from("test.json")], InputFormat::JsonLines),
             OutputFormat::Debug,
+            false,
         );
         let code = gen.generate().unwrap();
 
@@ -351,6 +422,7 @@ mod tests {
             "_.take(5)".to_string(),
             default_input(),
             OutputFormat::JsonLines,
+            false,
         );
         let code = gen.generate().unwrap();
 
@@ -359,7 +431,12 @@ mod tests {
 
     #[test]
     fn generate_csv_output() {
-        let gen = CodeGenerator::new("_.take(5)".to_string(), default_input(), OutputFormat::Csv);
+        let gen = CodeGenerator::new(
+            "_.take(5)".to_string(),
+            default_input(),
+            OutputFormat::Csv,
+            false,
+        );
         let code = gen.generate().unwrap();
 
         assert!(code.contains("output_csv"));
@@ -371,6 +448,7 @@ mod tests {
             "_.count()".to_string(),
             default_input(),
             OutputFormat::Debug,
+            false,
         );
         assert!(gen.has_terminal_operation());
 
@@ -378,6 +456,7 @@ mod tests {
             "_.collect()".to_string(),
             default_input(),
             OutputFormat::Debug,
+            false,
         );
         assert!(gen.has_terminal_operation());
 
@@ -385,13 +464,19 @@ mod tests {
             "_.filter(|x| true)".to_string(),
             default_input(),
             OutputFormat::Debug,
+            false,
         );
         assert!(!gen.has_terminal_operation());
     }
 
     #[test]
     fn generate_json_output_with_terminal() {
-        let gen = CodeGenerator::new("_.count()".to_string(), default_input(), OutputFormat::Json);
+        let gen = CodeGenerator::new(
+            "_.count()".to_string(),
+            default_input(),
+            OutputFormat::Json,
+            false,
+        );
         let code = gen.generate().unwrap();
 
         // Should use to_string not to_string_pretty for terminal operations
@@ -401,7 +486,12 @@ mod tests {
 
     #[test]
     fn generate_csv_output_with_terminal() {
-        let gen = CodeGenerator::new("_.first()".to_string(), default_input(), OutputFormat::Csv);
+        let gen = CodeGenerator::new(
+            "_.first()".to_string(),
+            default_input(),
+            OutputFormat::Csv,
+            false,
+        );
         let code = gen.generate().unwrap();
 
         // Should wrap single result in array for CSV output

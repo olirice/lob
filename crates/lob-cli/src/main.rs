@@ -177,7 +177,7 @@ fn run() -> Result<()> {
 
     // Generate code
     let expression_clone = expression.clone();
-    let generator = CodeGenerator::new(expression, input_source.clone(), output_format);
+    let generator = CodeGenerator::new(expression, input_source.clone(), output_format, args.stats);
     let source = generator.generate()?;
 
     if args.show_source {
