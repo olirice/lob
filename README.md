@@ -252,16 +252,20 @@ lob --clear-cache
 ### Performance Statistics
 
 ```bash
-# Show execution statistics (opt-in)
-lob data.txt '_.filter(|x| x.len() > 10).count()' --stats
+# Show live execution statistics (opt-in)
+seq 1 100000 | lob '_.filter(|x| x.parse::<i32>().unwrap() % 2 == 0).count()' --stats
 # Output:
-# 45231
+# [Stats] Items: 10000 | Throughput: 12832160 items/s | Elapsed: 0.0s
+# [Stats] Items: 20000 | Throughput: 12570047 items/s | Elapsed: 0.0s
+# ...
+# [Final Stats] Total items: 100000 | Throughput: 6990441 items/s | Total time: 0.014s
+# 50000
 #
 # Statistics:
-#   Compilation time: 115.75µs
-#   Execution time:   67.96ms
-#   Total time:       68.07ms
-#   Cache:            Hit (binary reused)
+#   Compilation time: 360.37ms
+#   Execution time:   260.73ms
+#   Total time:       621.10ms
+#   Cache:            Miss (compiled)
 ```
 
 ### Debug Mode
