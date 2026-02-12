@@ -18,5 +18,8 @@ Thumbs.db
 # Cache
 .cache/
 
+# Coverage
+.coverage
+
 # Documentation build
 /docs/site/
