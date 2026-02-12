@@ -13,6 +13,13 @@ pub struct CompileResult {
     pub cache_hit: bool,
 }
 
+/// Resolved paths to lob rlib files needed for compilation
+struct RlibPaths {
+    lob_prelude: PathBuf,
+    lob_core: PathBuf,
+    deps_dir: PathBuf,
+}
+
 /// Compiler for lob expressions
 pub struct Compiler {
     /// Path to rustc executable
@@ -21,25 +28,69 @@ pub struct Compiler {
     sysroot: Option<PathBuf>,
 }
 
+/// Find a file matching `{prefix}*.rlib` in a directory
+fn find_rlib_in_dir(dir: &Path, prefix: &str) -> Option<PathBuf> {
+    std::fs::read_dir(dir).ok()?.find_map(|entry| {
+        let entry = entry.ok()?;
+        let path = entry.path();
+        let name_str = path.file_name()?.to_str()?;
+        let is_rlib = path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("rlib"));
+        if name_str.starts_with(prefix) && is_rlib {
+            Some(path)
+        } else {
+            None
+        }
+    })
+}
+
 impl Compiler {
-    /// Find the target directory containing compiled lob libraries
-    fn find_target_dir() -> Option<PathBuf> {
+    /// Try to locate lob rlib files in a build directory (debug or release).
+    ///
+    /// First checks for direct rlibs (`liblob_prelude.rlib` — produced by `cargo build`),
+    /// then falls back to searching `deps/` for hashed rlibs (`liblob_prelude-<hash>.rlib`
+    /// — the only form produced by `cargo test`).
+    fn find_rlibs_in(build_dir: &Path) -> Option<RlibPaths> {
+        let deps_dir = build_dir.join("deps");
+
+        // Direct rlibs (from `cargo build`)
+        let prelude = build_dir.join("liblob_prelude.rlib");
+        let core = build_dir.join("liblob_core.rlib");
+        if prelude.exists() && core.exists() {
+            return Some(RlibPaths {
+                lob_prelude: prelude,
+                lob_core: core,
+                deps_dir,
+            });
+        }
+
+        // Hashed rlibs in deps/ (from `cargo test`)
+        if deps_dir.is_dir() {
+            let prelude = find_rlib_in_dir(&deps_dir, "liblob_prelude-")?;
+            let core = find_rlib_in_dir(&deps_dir, "liblob_core-")?;
+            return Some(RlibPaths {
+                lob_prelude: prelude,
+                lob_core: core,
+                deps_dir,
+            });
+        }
+
+        None
+    }
+
+    /// Find the rlib paths for `lob_prelude` and `lob_core` across multiple strategies
+    fn find_rlib_paths() -> Option<RlibPaths> {
         // Strategy 1: Use CARGO_MANIFEST_DIR (works during cargo test/run)
         if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
             let root = PathBuf::from(manifest_dir);
-
-            // Navigate up ancestors to find workspace root with target/ dir containing lob_prelude
             for ancestor in root.ancestors() {
-                let debug_dir = ancestor.join("target").join("debug");
-                let prelude_lib = debug_dir.join("liblob_prelude.rlib");
-                if prelude_lib.exists() {
-                    return Some(debug_dir);
+                let target = ancestor.join("target");
+                if let Some(rlibs) = Self::find_rlibs_in(&target.join("debug")) {
+                    return Some(rlibs);
                 }
-
-                let release_dir = ancestor.join("target").join("release");
-                let prelude_lib = release_dir.join("liblob_prelude.rlib");
-                if prelude_lib.exists() {
-                    return Some(release_dir);
+                if let Some(rlibs) = Self::find_rlibs_in(&target.join("release")) {
+                    return Some(rlibs);
                 }
             }
         }
@@ -47,76 +98,50 @@ impl Compiler {
         // Strategy 2: Look relative to the executable
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
-                // Check if we're in deps/ subdirectory (test executable)
+                // Test executables live in deps/
                 if exe_dir.ends_with("deps") {
                     if let Some(build_dir) = exe_dir.parent() {
-                        // We're in target/debug/deps or target/release/deps
-                        let prelude_lib = build_dir.join("liblob_prelude.rlib");
-                        if prelude_lib.exists() {
-                            return Some(build_dir.to_path_buf());
+                        if let Some(rlibs) = Self::find_rlibs_in(build_dir) {
+                            return Some(rlibs);
                         }
                     }
                 }
 
-                // Regular executable path handling
                 if let Some(target_parent) = exe_dir.parent() {
-                    // Try debug first (avoids LTO linking issues)
-                    let debug_dir = target_parent.join("debug");
-                    let prelude_lib = debug_dir.join("liblob_prelude.rlib");
-                    if prelude_lib.exists() {
-                        return Some(debug_dir);
+                    if let Some(rlibs) = Self::find_rlibs_in(&target_parent.join("debug")) {
+                        return Some(rlibs);
                     }
-
-                    // Fall back to release
-                    let release_dir = target_parent.join("release");
-                    let prelude_lib = release_dir.join("liblob_prelude.rlib");
-                    if prelude_lib.exists() {
-                        return Some(release_dir);
+                    if let Some(rlibs) = Self::find_rlibs_in(&target_parent.join("release")) {
+                        return Some(rlibs);
                     }
                 }
 
-                // Try same directory as executable
-                let target_dir = exe_dir.to_path_buf();
-                let prelude_lib = target_dir.join("liblob_prelude.rlib");
-                if prelude_lib.exists() {
-                    return Some(target_dir);
+                if let Some(rlibs) = Self::find_rlibs_in(exe_dir) {
+                    return Some(rlibs);
                 }
             }
         }
 
         // Strategy 3: Look in current working directory
         if let Ok(cwd) = std::env::current_dir() {
-            // Try debug first
-            let debug_dir = cwd.join("target").join("debug");
-            let prelude_lib = debug_dir.join("liblob_prelude.rlib");
-            if prelude_lib.exists() {
-                return Some(debug_dir);
+            if let Some(rlibs) = Self::find_rlibs_in(&cwd.join("target").join("debug")) {
+                return Some(rlibs);
             }
-
-            // Try release
-            let release_dir = cwd.join("target").join("release");
-            let prelude_lib = release_dir.join("liblob_prelude.rlib");
-            if prelude_lib.exists() {
-                return Some(release_dir);
+            if let Some(rlibs) = Self::find_rlibs_in(&cwd.join("target").join("release")) {
+                return Some(rlibs);
             }
         }
 
-        // Strategy 4: Try to find workspace root by walking up from cwd
+        // Strategy 4: Walk up from cwd
         if let Ok(mut current) = std::env::current_dir() {
             loop {
-                let debug_dir = current.join("target").join("debug");
-                let prelude_lib = debug_dir.join("liblob_prelude.rlib");
-                if prelude_lib.exists() {
-                    return Some(debug_dir);
+                let target = current.join("target");
+                if let Some(rlibs) = Self::find_rlibs_in(&target.join("debug")) {
+                    return Some(rlibs);
                 }
-
-                let release_dir = current.join("target").join("release");
-                let prelude_lib = release_dir.join("liblob_prelude.rlib");
-                if prelude_lib.exists() {
-                    return Some(release_dir);
+                if let Some(rlibs) = Self::find_rlibs_in(&target.join("release")) {
+                    return Some(rlibs);
                 }
-
-                // Move up one directory
                 if !current.pop() {
                     break;
                 }
@@ -177,19 +202,13 @@ impl Compiler {
             .arg(source_path);
 
         // Add extern crate paths for lob-prelude and its dependencies
-        if let Some(target_dir) = Self::find_target_dir() {
+        if let Some(rlibs) = Self::find_rlib_paths() {
             cmd.arg("--extern")
-                .arg(format!(
-                    "lob_prelude={}/liblob_prelude.rlib",
-                    target_dir.display()
-                ))
+                .arg(format!("lob_prelude={}", rlibs.lob_prelude.display()))
                 .arg("--extern")
-                .arg(format!(
-                    "lob_core={}/liblob_core.rlib",
-                    target_dir.display()
-                ))
+                .arg(format!("lob_core={}", rlibs.lob_core.display()))
                 .arg("-L")
-                .arg(format!("dependency={}", target_dir.join("deps").display()));
+                .arg(format!("dependency={}", rlibs.deps_dir.display()));
         }
 
         // Add sysroot if provided (for embedded toolchain)

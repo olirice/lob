@@ -654,6 +654,55 @@ fn error_no_expression() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn error_cannot_find_function() -> Result<()> {
+    // Calling a free function that doesn't exist triggers "cannot find function" in rustc
+    lob()
+        .arg("nonexistent_fn()")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Problem:"))
+        .stderr(predicate::str::contains("Unknown function"));
+    Ok(())
+}
+
+#[test]
+fn error_not_an_iterator() -> Result<()> {
+    // count() returns usize, calling filter on it is a type error
+    lob()
+        .arg("_.count().filter(|x| x > 0)")
+        .write_stdin("a\nb\nc\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Compilation Error"));
+    Ok(())
+}
+
+#[test]
+fn error_closure_type_mismatch() -> Result<()> {
+    // Return a non-bool (usize) from filter closure triggers mismatched types + closure
+    lob()
+        .arg("_.filter(|x| x.len())")
+        .write_stdin("a\nb\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Compilation Error"));
+    Ok(())
+}
+
+#[test]
+fn error_method_not_found() -> Result<()> {
+    // Calling a non-existent method on an iterator item
+    lob()
+        .arg("_.nonexistent_method()")
+        .write_stdin("a\nb\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Compilation Error"))
+        .stderr(predicate::str::contains("nonexistent_method"));
+    Ok(())
+}
+
 // ── Caching ──────────────────────────────────────────────────────
 
 #[test]

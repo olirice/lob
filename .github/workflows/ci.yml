@@ -82,6 +82,8 @@ jobs:
 
       - name: Build release
         run: cargo build --release --verbose
+        env:
+          CARGO_PROFILE_RELEASE_LTO: false
 
       - name: Test binary
         if: runner.os != 'Windows'
@@ -104,6 +106,9 @@ jobs:
 
       - name: Install tarpaulin
         run: cargo install cargo-tarpaulin
+
+      - name: Build libraries
+        run: cargo build --all
 
       - name: Generate coverage
         run: cargo tarpaulin --out Xml --all-features

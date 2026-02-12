@@ -241,6 +241,52 @@ fn left_join_multiple_matches() {
 }
 
 #[test]
+fn left_join_multiple_left_multiple_right() {
+    // Multiple left items each matching multiple right items.
+    // Exercises the state reset (current_left = None, idx = 0, emitted = false)
+    // after exhausting right matches for each left key.
+    let left = vec![(1, "a"), (2, "b")];
+    let right = vec![(1, "x"), (1, "y"), (2, "p"), (2, "q")];
+
+    let result: Vec<_> = left
+        .into_iter()
+        .lob()
+        .join_left(right, |x| x.0, |x| x.0)
+        .collect();
+
+    // 2 right matches for key=1 + 2 right matches for key=2 = 4 total
+    assert_eq!(result.len(), 4);
+    assert!(result.iter().all(|(_, r)| r.is_some()));
+    // Verify ordering: all key=1 matches come before key=2 matches
+    assert_eq!(result[0].0, (1, "a"));
+    assert_eq!(result[1].0, (1, "a"));
+    assert_eq!(result[2].0, (2, "b"));
+    assert_eq!(result[3].0, (2, "b"));
+}
+
+#[test]
+fn left_join_mixed_match_and_no_match() {
+    // Interleave matching and non-matching left keys to exercise
+    // both the "emit with None" and "exhaust right matches" paths.
+    let left = vec![(1, "a"), (2, "b"), (3, "c"), (4, "d")];
+    let right = vec![(1, "x"), (1, "y"), (3, "z")];
+
+    let result: Vec<_> = left
+        .into_iter()
+        .lob()
+        .join_left(right, |x| x.0, |x| x.0)
+        .collect();
+
+    // key=1: 2 matches, key=2: None, key=3: 1 match, key=4: None => 5 total
+    assert_eq!(result.len(), 5);
+    assert_eq!(result[0], ((1, "a"), Some((1, "x"))));
+    assert_eq!(result[1], ((1, "a"), Some((1, "y"))));
+    assert_eq!(result[2], ((2, "b"), None));
+    assert_eq!(result[3], ((3, "c"), Some((3, "z"))));
+    assert_eq!(result[4], ((4, "d"), None));
+}
+
+#[test]
 fn join_with_filter() {
     let left = vec![(1, "a"), (2, "b"), (3, "c"), (4, "d")];
     let right = vec![(1, "x"), (2, "y"), (3, "z")];
