@@ -5,8 +5,6 @@
 [![CI](https://github.com/olirice/lob/workflows/CI/badge.svg)](https://github.com/olirice/lob/actions)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> **Inspired by [flupy](https://github.com/olirice/flupy)** - Python's fluent pipeline library
-
 ## Features
 
 - **Native Rust Performance** - Compiled pipelines run at native speed
