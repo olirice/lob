@@ -23,7 +23,7 @@ jobs:
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: Release v${{ steps.get_version.outputs.version }}
           draft: false
@@ -102,7 +102,7 @@ jobs:
         shell: bash
 
       - name: Upload Release Asset
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             lob-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz
